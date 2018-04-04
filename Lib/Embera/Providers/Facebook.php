@@ -66,7 +66,7 @@ class Facebook extends \Embera\Adapters\Service
          *
          * https://www.facebook.com/media/set?set={set-id}
          */
-        '~facebook\.com/media/set/?\?set=(?:[^/ ]+)~i',
+         '~facebook\.com/media/set/?\?set=(?:[^/ ]+)~i',
     );
 
 
@@ -79,22 +79,17 @@ class Facebook extends \Embera\Adapters\Service
         '~facebook\.com/(?:[^/]+)/videos/(?:[^/]+)/?~i',
 
         /**
-         * https://www.facebook.com/video.php?id={video-id}
+`        * https://www.facebook.com/video.php?id={video-id}
          * https://www.facebook.com/video.php?v={video-id}
          */
         '~facebook\.com/video\.php\?(?:id|v)=(?:[^ ]+)~i',
-    );
-
-    /** Patterns that match page urls */
-    protected $pagePatterns = array(
-        '~facebook\.com\/\S+[\/]?$~'
     );
 
     /** inline {@inheritdoc} */
     protected function validateUrl()
     {
         $this->url->convertToHttps();
-        return ($this->urlMatchesPattern(array_merge($this->postPatterns, $this->videoPatterns, $this->pagePatterns)));
+        return ($this->urlMatchesPattern(array_merge($this->postPatterns, $this->videoPatterns)));
     }
 
     /**
@@ -127,12 +122,9 @@ class Facebook extends \Embera\Adapters\Service
      */
     public function getInfo()
     {
+        $this->apiUrl = 'https://www.facebook.com/plugins/post/oembed.json/';
         if ($this->urlMatchesPattern($this->videoPatterns)) {
             $this->apiUrl = 'https://www.facebook.com/plugins/video/oembed.json/';
-        } elseif ($this->urlMatchesPattern($this->postPatterns)) {
-            $this->apiUrl = 'https://www.facebook.com/plugins/post/oembed.json/';
-        } else {
-            $this->apiUrl = 'https://www.facebook.com/plugins/page/oembed.json/';
         }
 
         return parent::getInfo();
@@ -152,23 +144,39 @@ class Facebook extends \Embera\Adapters\Service
     {
         if (!empty($response['html'])) {
             $iframe = '<iframe id="embera-iframe-{md5}" class="embera-facebook-iframe" src="https://www.facebook.com/plugins/post.php?href={url}&width={width}&height={height}&show_text=true&appId" width="{width}" height="{height}"" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowTransparency="true"></iframe>';
+
             if (!empty($response['height'])) {
                 $height = $response['height'];
             } else {
                 $height = min(680, (int) ($response['width'] + 100));
             }
+
             $table = array(
                 '{url}' => rawurlencode($this->url),
                 '{md5}' => substr(md5($this->url), 0, 5),
                 '{width}' => $response['width'],
                 '{height}' => $height,
             );
+
             // Backup the real response
             $response['raw']['html'] = $response['html'];
+
             // Replace the html response
             $response['html'] = str_replace(array_keys($table), array_values($table), $iframe);
         }
+
         return $response;
+    }
+
+    public function fakeResponse()
+    {
+        return array(
+            'type' => 'video',
+            'provider_name' => 'Youtube',
+            'provider_url' => 'http://www.youtube.com',
+            'title' => 'Unknown title',
+            'html' => '<iframe class="embera-facebook-iframe" src="https://www.facebook.com/plugins/post.php?href=' . urlencode($this->url) . '&width={width}"&height={height}&show_text=true&appId" width="{width}" height="{height}"" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowTransparency="true"></iframe>'
+        );
     }
 }
 
